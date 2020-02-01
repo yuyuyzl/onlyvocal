@@ -1,6 +1,8 @@
 from pydub import AudioSegment
 from multiprocessing import Pool
 import math
+
+
 def calculateMinK(item):
     songSlice = item[0]
     musicSlice = item[1]
@@ -12,11 +14,13 @@ def calculateMinK(item):
             mindbfs = dbfs
     return -mink * 0.1
 
+
 def applyGain(item):
     songSlice = item[0]
     musicSlice = item[1]
     gain = item[2]
     return songSlice.overlay(musicSlice.apply_gain(gain))
+
 
 if __name__ == '__main__':
     sliceLength=100
@@ -26,21 +30,14 @@ if __name__ == '__main__':
     song=song[::sliceLength]
     music=music[::sliceLength]
 
-    #mix = song.overlay(music.apply_gain(-8.4))
-
-
     mix=AudioSegment.empty()
 
     currentSlice=0
     mink=0
-    kList=[]
-
 
     with Pool() as p:
         kList=p.map(calculateMinK,zip(song,music),totalSlices//64)
 
-
-    fadeDuration=20
     song = AudioSegment.from_wav("lion518vocalEQ.wav")
     music = AudioSegment.from_wav("lion518instEQ.wav")
     song=song[::sliceLength]
@@ -48,18 +45,21 @@ if __name__ == '__main__':
     targetGain=[]
     for currentSlice in range(len(kList)):
         iStart = currentSlice - 1
-        if (iStart < 0):
+        if iStart < 0:
             iStart = 0
         iEnd = currentSlice + 1
         arr = kList[iStart:iEnd]
         gain = sum(arr) / len(arr)
         targetGain.append(gain)
 
-
     with Pool() as p:
         mixSlices=p.map(applyGain,zip(song,music,targetGain),totalSlices//64)
 
     for s in mixSlices:
         mix+=s
+        # if len(mix)<25 or len(s)<25:
+        #     mix+=s
+        # else:
+        #     mix=mix.append(s,25)
 
     mix.export("export.wav", format="wav")
