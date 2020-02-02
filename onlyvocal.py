@@ -1,14 +1,17 @@
 from pydub import AudioSegment
 from multiprocessing import Pool
+from matplotlib import pyplot
+import numpy
 import math
 import time
+import os
 
 
 def calculateMinK(item):
     songSlice = item[0]
     musicSlice = item[1]
     mindbfs = 1
-    for k in range(0, 200):
+    for k in range(80, 200):
         dbfs = songSlice.overlay(musicSlice.apply_gain(-k * 0.1)).dBFS
         if dbfs < mindbfs:
             mink = k
@@ -64,14 +67,13 @@ if __name__ == '__main__':
         music = music[::sliceLength]
         targetGain = []
         for currentSlice in range(len(kList)):
-            iStart = currentSlice - 5
+            iStart = currentSlice - 10
             if iStart < 0:
                 iStart = 0
-            iEnd = currentSlice + 6
+            iEnd = currentSlice + 11
             arr = kList[iStart:iEnd]
             gain = sum(arr) / len(arr)
             targetGain.append(gain)
-
         print("APPLY GAIN")
         mixSlices = showProgress(p.map_async(applyGain, zip(song, music, targetGain), totalSlices // 99),"GAIN")
         while len(mixSlices) > 1:
@@ -85,3 +87,11 @@ if __name__ == '__main__':
         #     mix=mix.append(s,25)
 
     mix.export("export.wav", format="wav")
+    os.startfile("export.wav")
+
+    pyplot.plot([t * sliceLength for t in range(len(targetGain))],
+                targetGain, "r-",
+                [t * sliceLength for t in range(len(kList))],
+                kList, 'g-', linewidth=1)
+    pyplot.xticks(range(0,400000,5000),["%02d:%02d"%(t//60,t%60) for t in range(0,400,5)])
+    pyplot.show()
