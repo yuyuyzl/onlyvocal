@@ -21,42 +21,54 @@ def applyGain(item):
     gain = item[2]
     return songSlice.overlay(musicSlice.apply_gain(gain))
 
+def appendSlices(item):
+    mix=AudioSegment.empty()
+    for s in item:
+        mix+=s
+    return mix
+
 
 if __name__ == '__main__':
-    sliceLength=100
-    song = AudioSegment.from_wav("lion518vocalEQ.wav")
-    music = AudioSegment.from_wav("lion518instEQ.wav")
-    totalSlices=math.ceil(len(song)/sliceLength)
-    song=song[::sliceLength]
-    music=music[::sliceLength]
-
-    mix=AudioSegment.empty()
-
-    currentSlice=0
-    mink=0
-
+    songPath="いのちの名前rec.wav"
+    musicPath="いのちの名前inst.wav"
     with Pool() as p:
+        print("START")
+        sliceLength=10
+        song = AudioSegment.from_wav(songPath)
+        music = AudioSegment.from_wav(musicPath)
+        totalSlices=math.ceil(len(song)/sliceLength)
+        song=song[::sliceLength]
+        music=music[::sliceLength]
+
+        mix=AudioSegment.empty()
+
+        currentSlice=0
+        mink=0
+
+        print("CALCULATE MIN K")
         kList=p.map(calculateMinK,zip(song,music),totalSlices//64)
 
-    song = AudioSegment.from_wav("lion518vocalEQ.wav")
-    music = AudioSegment.from_wav("lion518instEQ.wav")
-    song=song[::sliceLength]
-    music=music[::sliceLength]
-    targetGain=[]
-    for currentSlice in range(len(kList)):
-        iStart = currentSlice - 1
-        if iStart < 0:
-            iStart = 0
-        iEnd = currentSlice + 1
-        arr = kList[iStart:iEnd]
-        gain = sum(arr) / len(arr)
-        targetGain.append(gain)
+        song = AudioSegment.from_wav(songPath)
+        music = AudioSegment.from_wav(musicPath)
+        song=song[::sliceLength]
+        music=music[::sliceLength]
+        targetGain=[]
+        for currentSlice in range(len(kList)):
+            iStart = currentSlice - 1
+            if iStart < 0:
+                iStart = 0
+            iEnd = currentSlice + 2
+            arr = kList[iStart:iEnd]
+            gain = sum(arr) / len(arr)
+            targetGain.append(gain)
 
-    with Pool() as p:
+        print("APPLY GAIN")
         mixSlices=p.map(applyGain,zip(song,music,targetGain),totalSlices//64)
+        while len(mixSlices)>1:
+            print("MIX SLICES",len(mixSlices))
+            mixSlices=p.map(appendSlices, [mixSlices[i:i+2] for i in range(0, len(mixSlices), 2)], 8)
 
-    for s in mixSlices:
-        mix+=s
+        mix=mixSlices[0]
         # if len(mix)<25 or len(s)<25:
         #     mix+=s
         # else:
