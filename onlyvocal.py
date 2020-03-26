@@ -6,17 +6,19 @@ import math
 import time
 import os
 
+muteGain=-120
 
 def calculateMinK(item):
     songSlice = item[0]
     musicSlice = item[1]
-    mindbfs = 1
-    for k in range(80, 200):
+    mindbfs = 9999
+    minGain=muteGain
+    for k in range(0, 100):
         dbfs = songSlice.overlay(musicSlice.apply_gain(-k * 0.1)).dBFS
         if dbfs < mindbfs:
-            mink = k
+            minGain = -k * 0.1
             mindbfs = dbfs
-    return -mink * 0.1
+    return minGain
 
 
 def applyGain(item):
@@ -42,13 +44,18 @@ def showProgress(asyncList, name="Task"):
 
 
 if __name__ == '__main__':
-    songPath = "いのちの名前rec.wav"
-    musicPath = "いのちの名前inst.wav"
+    print("LiveRecord: ")
+    songPath = input()
+    #songPath = "testvocal.wav"
+    print("Instrumental: ")
+    musicPath = input()
+    #musicPath = "testinst.wav"
     with Pool() as p:
         print("START")
-        sliceLength = 10
+        sliceLength = 20
         song = AudioSegment.from_wav(songPath)
         music = AudioSegment.from_wav(musicPath)
+        songlength=len(song)
         totalSlices = math.ceil(len(song) / sliceLength)
         song = song[::sliceLength]
         music = music[::sliceLength]
@@ -59,18 +66,25 @@ if __name__ == '__main__':
         mink = 0
 
         print("CALCULATE MIN K")
-        kList = showProgress(p.map_async(calculateMinK, zip(song, music), totalSlices // 99),"MINK")
+        kList = showProgress(p.map_async(calculateMinK, zip(song, music), totalSlices // 99),"ANALYZE")
 
         song = AudioSegment.from_wav(songPath)
         music = AudioSegment.from_wav(musicPath)
         song = song[::sliceLength]
         music = music[::sliceLength]
         targetGain = []
+        # for currentSlice in range(len(kList)):
+        #     if(kList[currentSlice]==muteGain):
+        #         if currentSlice==0:
+        #             kList[currentSlice]=muteGain
+        #         else:
+        #             kList[currentSlice]=kList[currentSlice-1]
+
         for currentSlice in range(len(kList)):
-            iStart = currentSlice - 10
+            iStart = currentSlice - 3
             if iStart < 0:
                 iStart = 0
-            iEnd = currentSlice + 11
+            iEnd = currentSlice + 4
             arr = kList[iStart:iEnd]
             gain = sum(arr) / len(arr)
             targetGain.append(gain)
@@ -85,7 +99,11 @@ if __name__ == '__main__':
         #     mix+=s
         # else:
         #     mix=mix.append(s,25)
-
+    song = AudioSegment.from_wav(songPath)
+    print("RES_DBFS:",mix.dBFS)
+    print("RES_DBFS_MAX:",mix.max_dBFS)
+    print("ORIG_DBFS:",song.dBFS)
+    print("ORIG_DBFS_MAX:",song.max_dBFS)
     mix.export("export.wav", format="wav")
     os.startfile("export.wav")
 
@@ -93,5 +111,5 @@ if __name__ == '__main__':
                 targetGain, "r-",
                 [t * sliceLength for t in range(len(kList))],
                 kList, 'g-', linewidth=1)
-    pyplot.xticks(range(0,400000,5000),["%02d:%02d"%(t//60,t%60) for t in range(0,400,5)])
+    pyplot.xticks(range(0,songlength,1000),["%02d:%02d"%(t//60,t%60) for t in range(0,songlength//1000,1)])
     pyplot.show()
