@@ -46,19 +46,26 @@ def showProgress(asyncList, name="Task"):
 if __name__ == '__main__':
     print("LiveRecord: ")
     songPath = input()
+    if songPath=="":
+        songPath="rv.wav"
     #songPath = "testvocal.wav"
     print("Instrumental: ")
     musicPath = input()
+    if musicPath=="":
+        musicPath="ri.wav"
     #musicPath = "testinst.wav"
     with Pool() as p:
         print("START")
         sliceLength = 20
-        song = AudioSegment.from_wav(songPath)
-        music = AudioSegment.from_wav(musicPath)
-        songlength=len(song)
-        totalSlices = math.ceil(len(song) / sliceLength)
-        song = song[::sliceLength]
-        music = music[::sliceLength]
+        matchOffset = 40
+        songOrig = AudioSegment.from_wav(songPath)
+        musicOrig = AudioSegment.from_wav(musicPath)
+        songlength=len(songOrig)
+        totalSlices = math.ceil(len(songOrig) / sliceLength)
+        song = songOrig[::sliceLength]
+        music = musicOrig[::sliceLength]
+        songMatch=[songOrig[i*sliceLength-matchOffset:(i+1)*sliceLength+matchOffset] for i in range(totalSlices)]
+        musicMatch=[musicOrig[i*sliceLength-matchOffset:(i+1)*sliceLength+matchOffset] for i in range(totalSlices)]
 
         mix = AudioSegment.empty()
 
@@ -66,7 +73,8 @@ if __name__ == '__main__':
         mink = 0
 
         print("CALCULATE MIN K")
-        kList = showProgress(p.map_async(calculateMinK, zip(song, music), totalSlices // 99),"ANALYZE")
+
+        kList = showProgress(p.map_async(calculateMinK, zip(songMatch, musicMatch), totalSlices // 99),"ANALYZE")
 
         song = AudioSegment.from_wav(songPath)
         music = AudioSegment.from_wav(musicPath)
@@ -81,12 +89,13 @@ if __name__ == '__main__':
         #             kList[currentSlice]=kList[currentSlice-1]
 
         for currentSlice in range(len(kList)):
-            iStart = currentSlice - 3
-            if iStart < 0:
-                iStart = 0
-            iEnd = currentSlice + 4
-            arr = kList[iStart:iEnd]
-            gain = sum(arr) / len(arr)
+            # iStart = currentSlice - 0
+            # if iStart < 0:
+            #     iStart = 0
+            # iEnd = currentSlice + 1
+            # arr = kList[iStart:iEnd]
+            # gain = sum(arr) / len(arr)
+            gain=kList[currentSlice]
             targetGain.append(gain)
         print("APPLY GAIN")
         mixSlices = showProgress(p.map_async(applyGain, zip(song, music, targetGain), totalSlices // 99),"GAIN")
@@ -111,5 +120,5 @@ if __name__ == '__main__':
                 targetGain, "r-",
                 [t * sliceLength for t in range(len(kList))],
                 kList, 'g-', linewidth=1)
-    pyplot.xticks(range(0,songlength,1000),["%02d:%02d"%(t//60,t%60) for t in range(0,songlength//1000,1)])
+    pyplot.xticks(range(0,songlength-1000,1000),["%02d:%02d"%(t//60,t%60) for t in range(0,songlength//1000,1)])
     pyplot.show()
